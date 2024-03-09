@@ -3,21 +3,31 @@
 #include <Arduino.h>
 
 const uint8_t STYLUS_PIN = 3;
-const uint8_t PADS_ORDER[16] = {8, 15, 14, 13, 12, 11, 10, 9,
-                                 0, 7,  6,  5,  4,  3,  2,  1};
+const uint8_t STRINGS_ORDER[16] = {8, 15, 14, 13, 12, 11, 10, 9,
+                                   0, 7,  6,  5,  4,  3,  2,  1};
 
 const uint8_t LEDS_ORDER[16] = {3,  2,  1, 0, 7,  6,  5,  4,
                                 11, 10, 9, 8, 15, 14, 13, 12};
+
+enum ParametersNames {
+  KEYS_OCTAVE,
+  TRANSPOSE,
+  KEYS_CHANNEL,
+  STRINGS_CHANNEL,
+  KEYBOARD,
+  PARAM_NUM
+};
+
 const uint8_t WHEEL_PIN = A0;
 
 const uint8_t DATA_PIN = 20;
 const uint8_t LATCH_PIN = 19;
 const uint8_t CLOCK_PIN = 18;
 
-const byte ROWS = 4; // rows
-const byte COLS = 4; // columns
-byte colPins[ROWS] = {4, 5, 6, 7};
-byte rowPins[COLS] = {8, 9, 10, 11};
+const uint8_t ROWS = 4; // rows
+const uint8_t COLS = 4; // columns
+uint8_t colPins[ROWS] = {4, 5, 6, 7};
+uint8_t rowPins[COLS] = {8, 9, 10, 11};
 
 const uint8_t keys[ROWS][COLS] = {
     {0, 4, 8, 12}, {1, 5, 9, 13}, {2, 6, 10, 14}, {3, 7, 11, 15}};
