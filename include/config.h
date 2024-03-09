@@ -38,6 +38,8 @@ const uint8_t LED_COUNT = 16;
 const uint8_t USB_MIDI_CHANNEL = 1;
 const uint8_t UPDATE_INTERVAL = 10;
 
+const uint16_t SCREEN_SAVER_TIMOUT = 5000;
+
 enum Colors {
   RED = 0x00FF0000,
   GREEN = 0x0000FF00,

@@ -13,7 +13,8 @@ uint32_t currentColor;
 uint8_t red[16] = {};
 uint8_t green[16] = {};
 uint8_t blue[16] = {};
-
+uint64_t lastTouched;
+bool isScreenSaver;
 uint8_t stylusLastReading[16];
 uint64_t lastUpdateTime;
 
@@ -90,15 +91,24 @@ void setup() {
   pinMode(CLOCK_PIN, OUTPUT);
   ////// WHEEL //////
   wheel.begin(WHEEL_PIN);
-  ////// PIXELS //////
-  pixel.begin();
-  pixel.setBrightness(255);
-  pixel.show();
   ////// KEYBOARD //////
   customKeypad.begin();
   ////// MIDI //////
   USB_MIDI.begin(MIDI_CHANNEL_OMNI);
   USB_MIDI.turnThruOff();
+  ////// PIXELS //////
+  pixel.begin();
+  pixel.setBrightness(255);
+  for (uint8_t i = 0; i < LED_COUNT; i++) {
+    pixel.setPixelColor(LEDS_ORDER[i], 15 * i, 0, 255 - (i * 15));
+    pixel.show();
+    delay(20);
+  }
+  delay(500);
+  for (uint8_t i = 0; i < LED_COUNT; i++) {
+    pixel.setPixelColor(LEDS_ORDER[i], 15 * 0);
+  }
+  pixel.show();
 }
 
 void loop() {
@@ -107,26 +117,22 @@ void loop() {
     ////// WHEEL //////
     if (wheel.update()) {
       uint8_t CCvalue = wheel.getValue();
+      USB_MIDI.sendControlChange(100, CCvalue, 1); // debugging
       // LOG TO LIN CONVERSION //
       float normalized = (float)CCvalue / 127;
       float linValue = pow(normalized, 0.6) * 127;
-      if (page == KEYBOARD) {
-        // TURN THE LAST LED OFF //
-        green[currentScale] = 0;
-        pixel.setPixelColor(LEDS_ORDER[currentScale], red[currentScale],
-                            green[currentScale], blue[currentScale]);
-        // ASSIGN NEW VALUE //
-        currentScale = map(linValue, 0, 127, 0, 15);
-        // currentScale = CCvalue >> 3;
-        // TURN THE LED ON //
-        green[currentScale] = 255;
-        pixel.setPixelColor(LEDS_ORDER[currentScale], red[currentScale],
-                            green[currentScale], blue[currentScale]);
-        pixel.show();
-
-        USB_MIDI.sendControlChange(100, CCvalue, 1);      // debugging
-        USB_MIDI.sendControlChange(101, currentScale, 1); // debugging
-      } else if (page == KEYS_OCTAVE) {                   ////// OCTAVE //////
+      if (page == KEYBOARD) { ////// SCALE //////
+        static uint8_t lastScale;
+        uint8_t reading = map(linValue, 0, 127, 0, 15);
+        if (reading != lastScale) {
+          currentScale = reading;
+          pixel.setPixelColor(LEDS_ORDER[lastScale], 0, 0, 0);
+          pixel.setPixelColor(LEDS_ORDER[currentScale], 255, 0, 200);
+          pixel.show();
+          lastScale = currentScale;
+          USB_MIDI.sendControlChange(101, currentScale, 1); // debugging
+        }
+      } else if (page == KEYS_OCTAVE) { ////// OCTAVE //////
         static uint8_t lastOctaveIndex = 2;
         uint8_t reading = map(linValue, 0, 127, 0, 3);
         if (reading != lastOctaveIndex) {
@@ -156,7 +162,31 @@ void loop() {
           pixel.show();
           lastTranspose = transpose;
         }
+      } else if (page == KEYS_CHANNEL) { ////// KEYBOARD MIDI CHANNEL //////
+        static uint8_t lastKeyChannel = 1;
+        uint8_t reading = map(linValue, 0, 127, 1, 16);
+        if (reading != lastKeyChannel) {
+          uint8_t note = getNote(currentScale, 2);
+          USB_MIDI.sendNoteOff(note, 0, keyChannel);
+          keyChannel = reading;
+          pixel.setPixelColor(LEDS_ORDER[lastKeyChannel - 1], 0, 0, 0);
+          pixel.setPixelColor(LEDS_ORDER[keyChannel - 1], 255, 255, 0);
+          pixel.show();
+          lastKeyChannel = keyChannel;
+        }
+      } else if (page == STRINGS_CHANNEL) { ////// STRINGS MIDI CHANNEL //////
+        static uint8_t lastStringsChannel = 2;
+        uint8_t reading = map(linValue, 0, 127, 1, 16);
+        if (reading != lastStringsChannel) {
+          stringsChannel = reading;
+          pixel.setPixelColor(LEDS_ORDER[lastStringsChannel - 1], 0, 0, 0);
+          pixel.setPixelColor(LEDS_ORDER[stringsChannel - 1], 255, 255, 0);
+          pixel.show();
+          lastStringsChannel = stringsChannel;
+        }
       }
+      lastTouched = millis();
+      isScreenSaver = false;
     }
     ////// STYLUS //////
     for (uint8_t i = 0; i < 16; i++) {
@@ -188,6 +218,8 @@ void loop() {
           pixel.show();
         }
         stylusLastReading[i] = stylusReading;
+        lastTouched = millis();
+        isScreenSaver = false;
       }
     }
     ////// SWITCHES //////
@@ -210,6 +242,8 @@ void loop() {
         pixel.setPixelColor(led, red[e.bit.KEY], green[e.bit.KEY],
                             blue[e.bit.KEY]);
         pixel.show();
+        lastTouched = millis();
+        isScreenSaver = false;
       } else if (e.bit.EVENT == KEY_JUST_RELEASED) {
         if (e.bit.KEY <= STRINGS_CHANNEL) {
           page = KEYBOARD;
@@ -224,6 +258,15 @@ void loop() {
                             blue[e.bit.KEY]);
         pixel.show();
       }
+    }
+    ////// SCREEN SAVER //////
+    if (millis() > lastTouched + SCREEN_SAVER_TIMOUT && !isScreenSaver) {
+      for (uint8_t i = 0; i < LED_COUNT; i++) {
+        pixel.setPixelColor(LEDS_ORDER[i], 15 * i, 0, 255 - (i * 15));
+        pixel.show();
+        delay(10);
+      }
+      isScreenSaver = true;
     }
   }
 }
