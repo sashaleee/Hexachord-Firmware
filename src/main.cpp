@@ -95,6 +95,8 @@ void redrawLEDs() {
     uint32_t color;
     // if (page == KEYBOARD) {
     if (stringPressed[i] == true) {
+      color = GREEN;
+    } else if (i == currentChord) {
       color = RED;
     } else if (keyPressed[i] == true) {
       color = BLUE;
@@ -102,6 +104,8 @@ void redrawLEDs() {
       color = YELLOW;
     } else if (i == octaveIndex * 4) {
       color = CYAN;
+    } else if (i == 1 + transpose + (transpose / 3)) {
+      color = PURPLE;
     } else {
       color = 0;
     }
@@ -176,9 +180,6 @@ void loop() {
           USB_MIDI.sendNoteOn(newNote, 127, keyChannel);
           uint8_t lastLed = 1 + lastTranspose + (lastTranspose / 3);
           uint8_t newLed = 1 + transpose + (transpose / 3);
-          // pixel.setPixelColor(LEDS_ORDER[lastLed], 0, 0, 0);
-          // pixel.setPixelColor(LEDS_ORDER[newLed], 255, 0, 255);
-          // pixel.show();
           redrawLEDs();
           lastTranspose = transpose;
         }
@@ -190,7 +191,7 @@ void loop() {
           USB_MIDI.sendNoteOff(note, 0, keyChannel);
           keyChannel = reading;
           pixel.setPixelColor(LEDS_ORDER[lastKeyChannel - 1], 0, 0, 0);
-          pixel.setPixelColor(LEDS_ORDER[keyChannel - 1], 255, 255, 0);
+          pixel.setPixelColor(LEDS_ORDER[keyChannel - 1], WHITE);
           pixel.show();
           lastKeyChannel = keyChannel;
         }
@@ -202,7 +203,7 @@ void loop() {
           USB_MIDI.sendNoteOff(note, 0, keyChannel);
           stringsChannel = reading;
           pixel.setPixelColor(LEDS_ORDER[lastStringsChannel - 1], 0, 0, 0);
-          pixel.setPixelColor(LEDS_ORDER[stringsChannel - 1], 255, 255, 0);
+          pixel.setPixelColor(LEDS_ORDER[stringsChannel - 1], WHITE);
           pixel.show();
           lastStringsChannel = stringsChannel;
         }
