@@ -1,5 +1,4 @@
 #include "Adafruit_Keypad.h"
-#include "Button.h"
 #include "Potentiometer.h"
 #include "config.h"
 #include <Adafruit_NeoPixel.h>

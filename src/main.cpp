@@ -9,10 +9,7 @@ Potentiometer wheel;
 Adafruit_Keypad customKeypad =
     Adafruit_Keypad(makeKeymap(keys), rowPins, colPins, ROWS, COLS);
 
-uint32_t currentColor;
-uint8_t red[16] = {};
-uint8_t green[16] = {};
-uint8_t blue[16] = {};
+uint8_t brightness = 50;
 uint64_t lastTouched;
 bool isScreenSaver;
 uint8_t stylusLastReading[16];
@@ -26,6 +23,8 @@ uint8_t currentChord;
 uint8_t currentChordType;
 uint8_t octaveIndex = 2;
 uint8_t keyboardOctaves[4] = {36, 48, 60, 72};
+bool keyPressed[16] = {};
+bool stringPressed[16] = {};
 uint8_t transpose = 0;
 uint8_t keyChannel = 1;
 uint8_t stringsChannel = 2;
@@ -82,6 +81,35 @@ uint8_t getChordStep(uint8_t scaleIndex, uint8_t chordIndex,
 
   return 36 + octave + note + transpose;
 }
+////// SCREEN SAVER //////
+void screenSaver(uint16_t delTime) {
+  for (uint8_t i = 0; i < LED_COUNT; i++) {
+    pixel.setPixelColor(LEDS_ORDER[i], 15 * i, 0, 255 - (i * 15));
+    pixel.show();
+    delay(delTime); // 20
+  }
+  isScreenSaver = true;
+}
+void redrawLEDs() {
+  for (uint8_t i = 0; i < LED_COUNT; i++) {
+    uint32_t color;
+    // if (page == KEYBOARD) {
+    if (stringPressed[i] == true) {
+      color = RED;
+    } else if (keyPressed[i] == true) {
+      color = BLUE;
+    } else if (i == currentScale) {
+      color = YELLOW;
+    } else if (i == octaveIndex * 4) {
+      color = CYAN;
+    } else {
+      color = 0;
+    }
+    // }
+    pixel.setPixelColor(LEDS_ORDER[i], color);
+  }
+  pixel.show();
+}
 
 void setup() {
   analogReadResolution(12);
@@ -98,17 +126,10 @@ void setup() {
   USB_MIDI.turnThruOff();
   ////// PIXELS //////
   pixel.begin();
-  pixel.setBrightness(255);
-  for (uint8_t i = 0; i < LED_COUNT; i++) {
-    pixel.setPixelColor(LEDS_ORDER[i], 15 * i, 0, 255 - (i * 15));
-    pixel.show();
-    delay(20);
-  }
-  delay(500);
-  for (uint8_t i = 0; i < LED_COUNT; i++) {
-    pixel.setPixelColor(LEDS_ORDER[i], 15 * 0);
-  }
-  pixel.show();
+  pixel.setBrightness(50);
+  screenSaver(40);
+  delay(300);
+  redrawLEDs();
 }
 
 void loop() {
@@ -116,6 +137,8 @@ void loop() {
     lastUpdateTime = millis();
     ////// WHEEL //////
     if (wheel.update()) {
+      lastTouched = millis();
+      isScreenSaver = false;
       uint8_t CCvalue = wheel.getValue();
       USB_MIDI.sendControlChange(100, CCvalue, 1); // debugging
       // LOG TO LIN CONVERSION //
@@ -126,9 +149,7 @@ void loop() {
         uint8_t reading = map(linValue, 0, 127, 0, 15);
         if (reading != lastScale) {
           currentScale = reading;
-          pixel.setPixelColor(LEDS_ORDER[lastScale], 0, 0, 0);
-          pixel.setPixelColor(LEDS_ORDER[currentScale], 255, 0, 200);
-          pixel.show();
+          redrawLEDs();
           lastScale = currentScale;
           USB_MIDI.sendControlChange(101, currentScale, 1); // debugging
         }
@@ -137,9 +158,7 @@ void loop() {
         uint8_t reading = map(linValue, 0, 127, 0, 3);
         if (reading != lastOctaveIndex) {
           octaveIndex = reading;
-          pixel.setPixelColor(LEDS_ORDER[lastOctaveIndex * 4], 0, 0, 0);
-          pixel.setPixelColor(LEDS_ORDER[octaveIndex * 4], 255, 100, 0);
-          pixel.show();
+          redrawLEDs();
           uint8_t lastNote = keyboardOctaves[lastOctaveIndex] + transpose - 12;
           uint8_t newNote = keyboardOctaves[octaveIndex] + transpose - 12;
           USB_MIDI.sendNoteOff(lastNote, 0, keyChannel);
@@ -157,9 +176,10 @@ void loop() {
           USB_MIDI.sendNoteOn(newNote, 127, keyChannel);
           uint8_t lastLed = 1 + lastTranspose + (lastTranspose / 3);
           uint8_t newLed = 1 + transpose + (transpose / 3);
-          pixel.setPixelColor(LEDS_ORDER[lastLed], 0, 0, 0);
-          pixel.setPixelColor(LEDS_ORDER[newLed], 255, 0, 255);
-          pixel.show();
+          // pixel.setPixelColor(LEDS_ORDER[lastLed], 0, 0, 0);
+          // pixel.setPixelColor(LEDS_ORDER[newLed], 255, 0, 255);
+          // pixel.show();
+          redrawLEDs();
           lastTranspose = transpose;
         }
       } else if (page == KEYS_CHANNEL) { ////// KEYBOARD MIDI CHANNEL //////
@@ -178,15 +198,25 @@ void loop() {
         static uint8_t lastStringsChannel = 2;
         uint8_t reading = map(linValue, 0, 127, 1, 16);
         if (reading != lastStringsChannel) {
+          uint8_t note = getNote(currentScale, 3);
+          USB_MIDI.sendNoteOff(note, 0, keyChannel);
           stringsChannel = reading;
           pixel.setPixelColor(LEDS_ORDER[lastStringsChannel - 1], 0, 0, 0);
           pixel.setPixelColor(LEDS_ORDER[stringsChannel - 1], 255, 255, 0);
           pixel.show();
           lastStringsChannel = stringsChannel;
         }
+      } else if (page == BRIGHTNESS) { ////// STRINGS MIDI CHANNEL //////
+        static uint8_t lastBrightness;
+        uint8_t reading = map(linValue, 0, 127, 2, 255);
+        if (reading != lastBrightness) {
+          brightness = reading;
+          screenSaver(0);
+          pixel.setBrightness(brightness);
+          pixel.show();
+          lastBrightness = brightness;
+        }
       }
-      lastTouched = millis();
-      isScreenSaver = false;
     }
     ////// STYLUS //////
     for (uint8_t i = 0; i < 16; i++) {
@@ -201,72 +231,65 @@ void loop() {
         uint8_t led = LEDS_ORDER[string];
         uint8_t note = getChordStep(currentScale, currentChord, string);
         static uint8_t lastNote;
+        lastTouched = millis();
+        isScreenSaver = false;
         if (stylusReading) {
           if (lastNote > 0) {
             USB_MIDI.sendNoteOff(lastNote, 0, stringsChannel);
           }
           USB_MIDI.sendNoteOn(note, 127, stringsChannel);
           USB_MIDI.sendControlChange(7, string, 2); // debuggig
+          stringPressed[string] = true;
           lastNote = note;
-          red[string] = 255;
-          pixel.setPixelColor(led, red[string], green[string], blue[string]);
-          pixel.show();
+          redrawLEDs();
+          // pixel.setPixelColor(led, 255, 0, 0);
+          // pixel.show();
         } else {
           USB_MIDI.sendNoteOff(note, 0, stringsChannel);
-          red[string] = 0;
-          pixel.setPixelColor(led, red[string], green[string], blue[string]);
-          pixel.show();
+          stringPressed[string] = false;
+          redrawLEDs();
         }
         stylusLastReading[i] = stylusReading;
-        lastTouched = millis();
-        isScreenSaver = false;
       }
     }
     ////// SWITCHES //////
     customKeypad.tick();
     while (customKeypad.available()) {
       keypadEvent e = customKeypad.read();
-      uint8_t led = LEDS_ORDER[e.bit.KEY];
-      uint8_t note = getNote(currentScale, e.bit.KEY);
+      uint8_t key = e.bit.KEY;
+      uint8_t led = LEDS_ORDER[key];
+      uint8_t note = getNote(currentScale, key);
       if (e.bit.EVENT == KEY_JUST_PRESSED) {
+        lastTouched = millis();
+        isScreenSaver = false;
+        redrawLEDs();
         // PAGE
-        if (e.bit.KEY <= STRINGS_CHANNEL) {
-          page = e.bit.KEY;
+        if (key <= BRIGHTNESS) {
+          page = key;
           USB_MIDI.sendControlChange(80, page, 1); // debuggig
         }
         // CHORD
-        currentChord = e.bit.KEY;
+        currentChord = key;
         USB_MIDI.sendControlChange(8, currentChord, 1); // debuggig
         USB_MIDI.sendNoteOn(note, 127, keyChannel);
-        blue[e.bit.KEY] = 255;
-        pixel.setPixelColor(led, red[e.bit.KEY], green[e.bit.KEY],
-                            blue[e.bit.KEY]);
-        pixel.show();
-        lastTouched = millis();
-        isScreenSaver = false;
+        keyPressed[key] = true;
+        redrawLEDs();
+        // pixel.setPixelColor(led, 0, 0, 255);
+        // pixel.show();
+
       } else if (e.bit.EVENT == KEY_JUST_RELEASED) {
-        if (e.bit.KEY <= STRINGS_CHANNEL) {
+        if (key <= BRIGHTNESS) {
           page = KEYBOARD;
           USB_MIDI.sendControlChange(80, page, 1); // debuggig
-          pixel.setPixelColor(LEDS_ORDER[currentScale], red[currentScale],
-                              green[currentScale], blue[currentScale]);
-          pixel.show();
         }
+        keyPressed[key] = false;
         USB_MIDI.sendNoteOff(note, 0, keyChannel);
-        blue[e.bit.KEY] = 0;
-        pixel.setPixelColor(led, red[e.bit.KEY], green[e.bit.KEY],
-                            blue[e.bit.KEY]);
-        pixel.show();
+        redrawLEDs();
       }
     }
     ////// SCREEN SAVER //////
     if (millis() > lastTouched + SCREEN_SAVER_TIMOUT && !isScreenSaver) {
-      for (uint8_t i = 0; i < LED_COUNT; i++) {
-        pixel.setPixelColor(LEDS_ORDER[i], 15 * i, 0, 255 - (i * 15));
-        pixel.show();
-        delay(10);
-      }
-      isScreenSaver = true;
+      screenSaver(20);
     }
   }
 }
