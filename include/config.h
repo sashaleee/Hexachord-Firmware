@@ -2,6 +2,8 @@
 #define CONFIG_H_
 #include <Arduino.h>
 
+const uint8_t MIDI_TX_PIN = 12; // MIDI out pin
+const uint8_t MIDI_RX_PIN = 13; // MIDI in pin
 const uint8_t STYLUS_PIN = 3;
 const uint8_t STRINGS_ORDER[16] = {8, 15, 14, 13, 12, 11, 10, 9,
                                    0, 7,  6,  5,  4,  3,  2,  1};
@@ -40,7 +42,7 @@ const uint8_t LED_COUNT = 16;
 const uint8_t USB_MIDI_CHANNEL = 1;
 const uint8_t UPDATE_INTERVAL = 10;
 
-const uint16_t SCREEN_SAVER_TIMOUT = 25000;
+const uint16_t SCREEN_SAVER_TIMOUT = 60000;
 
 enum Colors {
   RED = 0x00FF0000,

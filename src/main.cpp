@@ -3,6 +3,7 @@
 
 Adafruit_USBD_MIDI usb_midi;
 MIDI_CREATE_INSTANCE(Adafruit_USBD_MIDI, usb_midi, USB_MIDI);
+MIDI_CREATE_INSTANCE(HardwareSerial, Serial1, TRS_MIDI);
 Adafruit_NeoPixel pixel(LED_COUNT, LED_PIN, NEO_GRB + NEO_KHZ800);
 Potentiometer wheel;
 
@@ -117,6 +118,8 @@ void redrawLEDs() {
 
 void setup() {
   analogReadResolution(12);
+  Serial1.setRX(MIDI_RX_PIN);
+  Serial1.setTX(MIDI_TX_PIN);
   pinMode(STYLUS_PIN, INPUT_PULLDOWN);
   pinMode(DATA_PIN, OUTPUT);
   pinMode(LATCH_PIN, OUTPUT);
@@ -127,6 +130,7 @@ void setup() {
   customKeypad.begin();
   ////// MIDI //////
   USB_MIDI.begin(MIDI_CHANNEL_OMNI);
+  TRS_MIDI.begin(MIDI_CHANNEL_OMNI);
   USB_MIDI.turnThruOff();
   ////// PIXELS //////
   pixel.begin();
@@ -167,6 +171,8 @@ void loop() {
           uint8_t newNote = keyboardOctaves[octaveIndex] + transpose - 12;
           USB_MIDI.sendNoteOff(lastNote, 0, keyChannel);
           USB_MIDI.sendNoteOn(newNote, 127, keyChannel);
+          TRS_MIDI.sendNoteOff(lastNote, 0, keyChannel);
+          TRS_MIDI.sendNoteOn(newNote, 127, keyChannel);
           lastOctaveIndex = octaveIndex;
         }
       } else if (page == TRANSPOSE) { ////// TRANSPOSE //////
@@ -178,6 +184,8 @@ void loop() {
           uint8_t newNote = keyboardOctaves[octaveIndex] + transpose;
           USB_MIDI.sendNoteOff(lastNote, 0, keyChannel);
           USB_MIDI.sendNoteOn(newNote, 127, keyChannel);
+          TRS_MIDI.sendNoteOff(lastNote, 0, keyChannel);
+          TRS_MIDI.sendNoteOn(newNote, 127, keyChannel);
           uint8_t lastLed = 1 + lastTranspose + (lastTranspose / 3);
           uint8_t newLed = 1 + transpose + (transpose / 3);
           redrawLEDs();
@@ -189,6 +197,7 @@ void loop() {
         if (reading != lastKeyChannel) {
           uint8_t note = getNote(currentScale, 2);
           USB_MIDI.sendNoteOff(note, 0, keyChannel);
+          TRS_MIDI.sendNoteOff(note, 0, keyChannel);
           keyChannel = reading;
           pixel.setPixelColor(LEDS_ORDER[lastKeyChannel - 1], 0, 0, 0);
           pixel.setPixelColor(LEDS_ORDER[keyChannel - 1], WHITE);
@@ -201,6 +210,7 @@ void loop() {
         if (reading != lastStringsChannel) {
           uint8_t note = getNote(currentScale, 3);
           USB_MIDI.sendNoteOff(note, 0, keyChannel);
+          TRS_MIDI.sendNoteOff(note, 0, keyChannel);
           stringsChannel = reading;
           pixel.setPixelColor(LEDS_ORDER[lastStringsChannel - 1], 0, 0, 0);
           pixel.setPixelColor(LEDS_ORDER[stringsChannel - 1], WHITE);
@@ -237,8 +247,10 @@ void loop() {
         if (stylusReading) {
           if (lastNote > 0) {
             USB_MIDI.sendNoteOff(lastNote, 0, stringsChannel);
+            TRS_MIDI.sendNoteOff(lastNote, 0, stringsChannel);
           }
           USB_MIDI.sendNoteOn(note, 127, stringsChannel);
+          TRS_MIDI.sendNoteOn(note, 127, stringsChannel);
           USB_MIDI.sendControlChange(7, string, 2); // debuggig
           stringPressed[string] = true;
           lastNote = note;
@@ -247,6 +259,7 @@ void loop() {
           // pixel.show();
         } else {
           USB_MIDI.sendNoteOff(note, 0, stringsChannel);
+          TRS_MIDI.sendNoteOff(note, 0, keyChannel);
           stringPressed[string] = false;
           redrawLEDs();
         }
@@ -273,6 +286,7 @@ void loop() {
         currentChord = key;
         USB_MIDI.sendControlChange(8, currentChord, 1); // debuggig
         USB_MIDI.sendNoteOn(note, 127, keyChannel);
+        TRS_MIDI.sendNoteOn(note, 127, keyChannel);
         keyPressed[key] = true;
         redrawLEDs();
         // pixel.setPixelColor(led, 0, 0, 255);
@@ -285,6 +299,7 @@ void loop() {
         }
         keyPressed[key] = false;
         USB_MIDI.sendNoteOff(note, 0, keyChannel);
+        TRS_MIDI.sendNoteOff(note, 0, keyChannel);
         redrawLEDs();
       }
     }
