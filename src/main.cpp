@@ -20,7 +20,8 @@ uint8_t page = KEYBOARD;
 ////// PARAMETERS //////
 uint8_t scale;
 uint8_t chord;
-uint8_t octaveIndex = 2;
+uint8_t keysOctaveIndex = 2;
+uint8_t stringsOctaveIndex = 2;
 const uint8_t KEYBOARD_OCTAVES[4] = {36, 48, 60, 72};
 bool isKeyPressed[16] = {};
 bool isStringPressed[16] = {};
@@ -53,9 +54,9 @@ uint8_t getNote(uint8_t scaleIndex, uint8_t noteIndex) {
   if (noteIndex > 0) {
     uint8_t octave = ((noteIndex - 1) / 7) * 12;
     uint8_t note = SCALES[scaleIndex][((noteIndex - 1) % 7)];
-    return (note + KEYBOARD_OCTAVES[octaveIndex] + transpose) + octave;
+    return (note + KEYBOARD_OCTAVES[keysOctaveIndex] + transpose) + octave;
   } else {
-    return KEYBOARD_OCTAVES[octaveIndex] + transpose - 12;
+    return KEYBOARD_OCTAVES[keysOctaveIndex] + transpose - 12;
   }
 }
 ////// GET CHORD //////
@@ -99,7 +100,7 @@ void redrawLEDs() {
       color = BLUE;
     } else if (i == scale) {
       color = YELLOW;
-    } else if (i == octaveIndex * 4) {
+    } else if (i == keysOctaveIndex * 4) {
       color = CYAN;
     } else if (i == 1 + transpose + (transpose / 3)) {
       color = PURPLE;
@@ -167,23 +168,23 @@ void loop() {
         static uint8_t lastOctaveIndex = 2;
         uint8_t reading = map(linValue, 0, 127, 0, 3);
         if (reading != lastOctaveIndex) {
-          octaveIndex = reading;
+          keysOctaveIndex = reading;
           redrawLEDs();
           uint8_t lastNote = KEYBOARD_OCTAVES[lastOctaveIndex] + transpose - 12;
-          uint8_t newNote = KEYBOARD_OCTAVES[octaveIndex] + transpose - 12;
+          uint8_t newNote = KEYBOARD_OCTAVES[keysOctaveIndex] + transpose - 12;
           USB_MIDI.sendNoteOff(lastNote, 0, keyChannel);
           USB_MIDI.sendNoteOn(newNote, 127, keyChannel);
           TRS_MIDI.sendNoteOff(lastNote, 0, keyChannel);
           TRS_MIDI.sendNoteOn(newNote, 127, keyChannel);
-          lastOctaveIndex = octaveIndex;
+          lastOctaveIndex = keysOctaveIndex;
         }
       } else if (page == TRANSPOSE) { ////// TRANSPOSE //////
         static uint8_t lastTranspose = 0;
         uint8_t reading = map(linValue, 0, 127, 0, 11);
         if (reading != lastTranspose) {
           transpose = reading;
-          uint8_t lastNote = KEYBOARD_OCTAVES[octaveIndex] + lastTranspose;
-          uint8_t newNote = KEYBOARD_OCTAVES[octaveIndex] + transpose;
+          uint8_t lastNote = KEYBOARD_OCTAVES[keysOctaveIndex] + lastTranspose;
+          uint8_t newNote = KEYBOARD_OCTAVES[keysOctaveIndex] + transpose;
           USB_MIDI.sendNoteOff(lastNote, 0, keyChannel);
           USB_MIDI.sendNoteOn(newNote, 127, keyChannel);
           TRS_MIDI.sendNoteOff(lastNote, 0, keyChannel);
@@ -275,7 +276,7 @@ void loop() {
           redrawLEDs();
         } else {
           USB_MIDI.sendNoteOff(note, 0, stringsChannel);
-          TRS_MIDI.sendNoteOff(note, 0, keyChannel);
+          TRS_MIDI.sendNoteOff(note, 0, stringsChannel);
           isStringPressed[string] = false;
           redrawLEDs();
         }

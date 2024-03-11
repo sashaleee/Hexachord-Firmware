@@ -52,5 +52,4 @@ enum Colors {
   PURPLE = 0x00FF00AA,
   WHITE = 0x00FFFFFF
 };
-// const uint32_t colors[4] = {RED, YELLOW, BLUE, CYAN};
 #endif
