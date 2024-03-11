@@ -17,6 +17,7 @@ enum ParametersNames {
   KEYS_CHANNEL,
   STRINGS_CHANNEL,
   BRIGHTNESS,
+  SCREEN_SAVER_ENABLED,
   KEYBOARD,
   SAVE = 15,
   PARAM_NUM
@@ -39,9 +40,7 @@ const uint8_t keys[ROWS][COLS] = {
 const uint8_t LED_PIN = 2; // Data out pin for SK6812 LEDs
 const uint8_t LED_COUNT = 16;
 
-const uint8_t USB_MIDI_CHANNEL = 1;
 const uint8_t UPDATE_INTERVAL = 10;
-
 const uint16_t SCREEN_SAVER_TIMOUT = 60000;
 
 enum Colors {
@@ -53,5 +52,5 @@ enum Colors {
   PURPLE = 0x00FF00AA,
   WHITE = 0x00FFFFFF
 };
-const uint32_t colors[4] = {RED, YELLOW, BLUE, CYAN};
+// const uint32_t colors[4] = {RED, YELLOW, BLUE, CYAN};
 #endif
