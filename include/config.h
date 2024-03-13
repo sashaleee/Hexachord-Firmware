@@ -2,6 +2,10 @@
 #define CONFIG_H_
 #include <Arduino.h>
 
+#define OFF 0
+#define ON 1
+#define DEBUGGING OFF
+
 const uint8_t MIDI_TX_PIN = 12; // MIDI out pin
 const uint8_t MIDI_RX_PIN = 13; // MIDI in pin
 const uint8_t STYLUS_PIN = 3;

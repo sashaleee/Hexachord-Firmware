@@ -14,7 +14,7 @@ uint8_t brightness = 50;
 uint64_t lastTouched;
 bool isScreenSaver;
 bool isChanged;
-
+bool screenSvaerEnabled;
 uint8_t page = KEYBOARD;
 
 ////// PARAMETERS //////
@@ -48,7 +48,19 @@ const int8_t SCALES[16][7] = {
     {0, 2, 3, 6, 7, 8, 11}   // 16.Double Harmonic Major
 };
 ////// CHORD TYPES //////
-int8_t chordTypes[4][3] = {{0, 2, 4}, {0, 2, 6}, {0, 1, 4}, {1, 3, 6}};
+const int8_t chordTypesSteps[4][3] = {
+    {0, 2, 4}, {0, 2, 6}, {0, 1, 4}, {1, 3, 6}};
+const int8_t chordTypesSemitones[10][3] = {
+    {0, 4, 7},  // Major
+    {0, 3, 7},  // Minor
+    {0, 3, 6},  // Diminished
+    {0, 4, 8},  // Augmented
+    {0, 2, 7},  // Suspended 2nd
+    {0, 5, 7},  // Suspended 4th
+    {0, 4, 10}, // Dominant 7th (no fifth)
+    {0, 3, 10}, // Minor 7th (no fifth)
+    {0, 4, 11}, // Major 7th (no fifth)
+};
 ////// GET NOTE //////
 uint8_t getNote(uint8_t scaleIndex, uint8_t noteIndex) {
   if (noteIndex > 0) {
@@ -68,16 +80,16 @@ uint8_t getChordStep(uint8_t scaleIndex, uint8_t chordIndex,
   uint8_t root = chordIndex - (chordIndex > 0);
   // uint8_t chordType = (chordIndex > 7) + (noteIndex > 7);
   uint8_t chordType = (chordIndex > 7);
-  uint8_t step = chordTypes[chordType][(noteIndex % NOTES_NUM)];
+  uint8_t step = chordTypesSteps[chordType][(noteIndex % NOTES_NUM)];
   uint8_t note = SCALES[scaleIndex][(step + root) % 7];
-
-  USB_MIDI.sendControlChange(1, octave, 1);    // debugging
-  USB_MIDI.sendControlChange(2, root, 1);      // debugging
-  USB_MIDI.sendControlChange(3, step, 1);      // debugging
-  USB_MIDI.sendControlChange(4, note, 1);      // debugging
-  USB_MIDI.sendControlChange(5, noteIndex, 1); // debugging
-  USB_MIDI.sendControlChange(6, chordType, 1); // debugging
-
+#if (DEBUGGING == ON)
+  USB_MIDI.sendControlChange(1, octave, 1);
+  USB_MIDI.sendControlChange(2, root, 1);
+  USB_MIDI.sendControlChange(3, step, 1);
+  USB_MIDI.sendControlChange(4, note, 1);
+  USB_MIDI.sendControlChange(5, noteIndex, 1);
+  USB_MIDI.sendControlChange(6, chordType, 1);
+#endif
   return 36 + octave + note + transpose;
 }
 ////// SCREEN SAVER //////
@@ -111,7 +123,11 @@ void redrawLEDs() {
   }
   pixel.show();
 }
-
+void clearScreen() {
+  for (uint8_t i = 0; i < LED_COUNT; i++) {
+    pixel.setPixelColor(LEDS_ORDER[i], 0);
+  }
+}
 void setup() {
   analogReadResolution(12);
   Serial1.setRX(MIDI_RX_PIN);
@@ -134,6 +150,8 @@ void setup() {
   keyChannel = EEPROM.read(KEYS_CHANNEL);
   stringsChannel = EEPROM.read(STRINGS_CHANNEL);
   transpose = EEPROM.read(TRANSPOSE);
+  screenSvaerEnabled = EEPROM.read(SCREEN_SAVER_ENABLED);
+  keysOctaveIndex = EEPROM.read(KEYS_OCTAVE);
   ////// PIXELS //////
   pixel.begin();
   pixel.setBrightness(brightness);
@@ -151,7 +169,9 @@ void loop() {
       lastTouched = millis();
       isScreenSaver = false;
       uint8_t CCvalue = wheel.getValue();
-      USB_MIDI.sendControlChange(100, CCvalue, 1); // debugging
+#if (DEBUGGING == ON)
+      USB_MIDI.sendControlChange(100, CCvalue, 1);
+#endif
       // LOG TO LIN CONVERSION //
       float normalized = (float)CCvalue / 127;
       float linValue = pow(normalized, 0.6) * 127;
@@ -162,7 +182,9 @@ void loop() {
           scale = reading;
           redrawLEDs();
           lastScale = scale;
-          USB_MIDI.sendControlChange(101, scale, 1); // debugging
+#if (DEBUGGING == ON)
+          USB_MIDI.sendControlChange(101, scale, 1);
+#endif
         }
       } else if (page == KEYS_OCTAVE) { ////// OCTAVE //////
         static uint8_t lastOctaveIndex = 2;
@@ -177,6 +199,7 @@ void loop() {
           TRS_MIDI.sendNoteOff(lastNote, 0, keyChannel);
           TRS_MIDI.sendNoteOn(newNote, 127, keyChannel);
           lastOctaveIndex = keysOctaveIndex;
+          isChanged = true;
         }
       } else if (page == TRANSPOSE) { ////// TRANSPOSE //////
         static uint8_t lastTranspose = 0;
@@ -203,7 +226,7 @@ void loop() {
           USB_MIDI.sendNoteOff(note, 0, keyChannel);
           TRS_MIDI.sendNoteOff(note, 0, keyChannel);
           keyChannel = reading;
-          pixel.setPixelColor(LEDS_ORDER[lastKeyChannel - 1], 0, 0, 0);
+          clearScreen();
           pixel.setPixelColor(LEDS_ORDER[keyChannel - 1], WHITE);
           pixel.show();
           lastKeyChannel = keyChannel;
@@ -217,7 +240,7 @@ void loop() {
           USB_MIDI.sendNoteOff(note, 0, keyChannel);
           TRS_MIDI.sendNoteOff(note, 0, keyChannel);
           stringsChannel = reading;
-          pixel.setPixelColor(LEDS_ORDER[lastStringsChannel - 1], 0, 0, 0);
+          clearScreen();
           pixel.setPixelColor(LEDS_ORDER[stringsChannel - 1], WHITE);
           pixel.show();
           lastStringsChannel = stringsChannel;
@@ -234,12 +257,32 @@ void loop() {
           lastBrightness = brightness;
           isChanged = true;
         }
+      } else if (page == SCREEN_SAVER_ENABLED) {
+        static uint8_t lastscreenSaverEnabled;
+        uint8_t reading = map(linValue, 0, 127, 0, 1);
+        if (reading != lastscreenSaverEnabled) {
+          screenSvaerEnabled = !screenSvaerEnabled;
+          uint8_t note = getNote(scale, 5);
+          USB_MIDI.sendNoteOff(note, 0, keyChannel);
+          TRS_MIDI.sendNoteOff(note, 0, keyChannel);
+          if (screenSvaerEnabled) {
+            screenSaver(1);
+          } else {
+            clearScreen();
+            pixel.show();
+          }
+          isChanged = true;
+          lastscreenSaverEnabled = reading;
+        }
+
       } else if (page == SAVE) { ////// SAVE TO EEPROM //////
         if (isChanged) {
           EEPROM.write(BRIGHTNESS, brightness);
           EEPROM.write(TRANSPOSE, transpose);
           EEPROM.write(KEYS_CHANNEL, keyChannel);
           EEPROM.write(STRINGS_CHANNEL, stringsChannel);
+          EEPROM.write(SCREEN_SAVER_ENABLED, screenSvaerEnabled);
+          EEPROM.write(KEYS_OCTAVE, keysOctaveIndex);
           EEPROM.commit();
           isChanged = false;
           screenSaver(1);
@@ -270,16 +313,17 @@ void loop() {
           }
           USB_MIDI.sendNoteOn(note, 127, stringsChannel);
           TRS_MIDI.sendNoteOn(note, 127, stringsChannel);
-          USB_MIDI.sendControlChange(7, string, 2); // debuggig
+#if (DEBUGGING == ON)
+          USB_MIDI.sendControlChange(7, string, 2);
+#endif
           isStringPressed[string] = true;
           lastNote = note;
-          redrawLEDs();
         } else {
           USB_MIDI.sendNoteOff(note, 0, stringsChannel);
           TRS_MIDI.sendNoteOff(note, 0, stringsChannel);
           isStringPressed[string] = false;
-          redrawLEDs();
         }
+        redrawLEDs();
         stylusLastReading[i] = stylusReading;
       }
     }
@@ -292,33 +336,31 @@ void loop() {
       uint8_t note = getNote(scale, key);
       if (e.bit.EVENT == KEY_JUST_PRESSED) {
         lastTouched = millis();
+        page = key;
+        chord = key;
+        isKeyPressed[key] = true;
         isScreenSaver = false;
         redrawLEDs();
-        // PAGE
-        if (key < PARAM_NUM) { // <= BRIGHTNESS
-          page = key;
-          USB_MIDI.sendControlChange(80, page, 1); // debuggig
-        }
-        // CHORD
-        chord = key;
-        USB_MIDI.sendControlChange(8, chord, 1); // debuggig
+#if (DEBUGGING == ON)
+        USB_MIDI.sendControlChange(80, page, 1);
+        USB_MIDI.sendControlChange(8, chord, 1);
+#endif
         USB_MIDI.sendNoteOn(note, 127, keyChannel);
         TRS_MIDI.sendNoteOn(note, 127, keyChannel);
-        isKeyPressed[key] = true;
-        redrawLEDs();
       } else if (e.bit.EVENT == KEY_JUST_RELEASED) {
-        if (key < PARAM_NUM) { // <= BRIGHTNESS
-          page = KEYBOARD;
-          USB_MIDI.sendControlChange(80, page, 1); // debuggig
-        }
+        page = KEYBOARD;
         isKeyPressed[key] = false;
+        redrawLEDs();
+#if (DEBUGGING == ON)
+        USB_MIDI.sendControlChange(80, page, 1);
+#endif
         USB_MIDI.sendNoteOff(note, 0, keyChannel);
         TRS_MIDI.sendNoteOff(note, 0, keyChannel);
-        redrawLEDs();
       }
     }
     ////// SCREEN SAVER //////
-    if (millis() > lastTouched + SCREEN_SAVER_TIMOUT && !isScreenSaver) {
+    if (millis() > lastTouched + SCREEN_SAVER_TIMOUT && !isScreenSaver &&
+        screenSvaerEnabled) {
       screenSaver(20);
     }
   }
