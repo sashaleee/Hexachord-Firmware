@@ -12,25 +12,28 @@ Adafruit_Keypad customKeypad =
 ////// LED //////
 uint8_t brightness = 50;
 uint64_t lastTouched;
+bool isKeyPressed[16] = {};
+bool isStringPressed[16] = {};
 bool isScreenSaver;
-////// PARAMETERS //////
-bool isChanged;
 bool screenSvaerEnabled;
-uint8_t page = DEFAULT;
+////// PARAMETERS //////
+uint8_t wheelMode = DEFAULT;
+uint8_t deviceMode;
+
+bool isChanged;
+
 bool majorChord = true;
 bool minorChord;
 bool seventhChord;
 bool dimAugChord;
 uint8_t rootNote;
-uint8_t mode;
+
 uint8_t scale;
 uint8_t chord;
-uint8_t keysOctaveIndex = 2;
-uint8_t stringsOctaveIndex = 2;
-const uint8_t KEYBOARD_OCTAVES[4] = {36, 48, 60, 72};
-bool isKeyPressed[16] = {};
-bool isStringPressed[16] = {};
 uint8_t transpose = 0;
+
+uint8_t keysOctaveIndex = 2;
+
 uint8_t keyChannel = 1;
 uint8_t stringsChannel = 2;
 ////// GET NOTE //////
@@ -52,14 +55,6 @@ uint8_t getChordStep(uint8_t noteIndex) {
   uint8_t chordType = (chord > 7);
   uint8_t step = chordTypesSteps[chordType][(noteIndex % NOTES_NUM)];
   uint8_t note = SCALES[scale][(step + root) % 7];
-#if (DEBUGGING == ON)
-  USB_MIDI.sendControlChange(1, octave, 1);
-  USB_MIDI.sendControlChange(2, root, 1);
-  USB_MIDI.sendControlChange(3, step, 1);
-  USB_MIDI.sendControlChange(4, note, 1);
-  USB_MIDI.sendControlChange(5, noteIndex, 1);
-  USB_MIDI.sendControlChange(6, chordType, 1);
-#endif
   return 36 + octave + note + transpose;
 }
 ////// OMNICHORD CHORD TYPE //////
@@ -102,7 +97,7 @@ void screenSaver(uint16_t delTime) {
 void redrawLEDs() {
   for (uint8_t i = 0; i < LED_COUNT; i++) {
     uint32_t color;
-    if (mode == DIATONIC) {
+    if (deviceMode == DIATONIC) {
       if (isStringPressed[i] == true) { // string
         color = YELLOW;
       } else if (i == chord) { // chord
@@ -122,7 +117,7 @@ void redrawLEDs() {
       else {
         color = 0;
       }
-    } else if (mode == CHROMATIC) {
+    } else if (deviceMode == CHROMATIC) {
       switch (i) {
       case 0:
         color = CYAN * majorChord;
@@ -185,8 +180,6 @@ void setup() {
   ////// PIXELS //////
   pixel.begin();
   pixel.setBrightness(brightness);
-  // screenSaver(40);
-  // delay(300);
   redrawLEDs();
 }
 
@@ -199,21 +192,18 @@ void loop() {
       lastTouched = millis();
       isScreenSaver = false;
       uint8_t CCvalue = wheel.getValue();
-#if (DEBUGGING == ON)
-      USB_MIDI.sendControlChange(100, CCvalue, 1);
-#endif
       // LOG TO LIN CONVERSION //
       float normalized = (float)CCvalue / 127;
       float linValue = pow(normalized, 0.6) * 127;
-      if (page == DEFAULT) { // MODES
+      if (wheelMode == DEFAULT) { ////// MODES //////
         static uint8_t lastMode;
         uint8_t reading = map(linValue, 0, 127, 0, 1);
         if (lastMode != reading) {
-          mode = reading;
-          lastMode = mode;
+          deviceMode = reading;
+          lastMode = deviceMode;
           redrawLEDs();
         }
-      } else if (page == SCALE) { ////// SCALE //////
+      } else if (wheelMode == SCALE) { ////// SCALE //////
         static uint8_t lastScale;
         uint8_t reading = map(linValue, 0, 127, 0, 15);
         if (reading != lastScale) {
@@ -223,11 +213,8 @@ void loop() {
           pixel.show();
           lastScale = scale;
           isChanged = true;
-#if (DEBUGGING == ON)
-          USB_MIDI.sendControlChange(101, scale, 1);
-#endif
         }
-      } else if (page == KEYS_OCTAVE) { ////// OCTAVE //////
+      } else if (wheelMode == KEYS_OCTAVE) { ////// OCTAVE //////
         static uint8_t lastOctaveIndex = 2;
         uint8_t reading = map(linValue, 0, 127, 0, 3);
         if (reading != lastOctaveIndex) {
@@ -245,7 +232,7 @@ void loop() {
           lastOctaveIndex = keysOctaveIndex;
           isChanged = true;
         }
-      } else if (page == TRANSPOSE) { ////// TRANSPOSE //////
+      } else if (wheelMode == TRANSPOSE) { ////// TRANSPOSE //////
         static uint8_t lastTranspose = 0;
         uint8_t reading = map(linValue, 0, 127, 0, 11);
         if (reading != lastTranspose) {
@@ -263,7 +250,8 @@ void loop() {
           lastTranspose = transpose;
           isChanged = true;
         }
-      } else if (page == KEYS_CHANNEL) { ////// KEYBOARD MIDI CHANNEL //////
+      } else if (wheelMode ==
+                 KEYS_CHANNEL) { ////// KEYBOARD MIDI CHANNEL //////
         static uint8_t lastKeyChannel = 1;
         uint8_t reading = map(linValue, 0, 127, 1, 16);
         if (reading != lastKeyChannel) {
@@ -277,7 +265,8 @@ void loop() {
           lastKeyChannel = keyChannel;
           isChanged = true;
         }
-      } else if (page == STRINGS_CHANNEL) { ////// STRINGS MIDI CHANNEL //////
+      } else if (wheelMode ==
+                 STRINGS_CHANNEL) { ////// STRINGS MIDI CHANNEL //////
         static uint8_t lastStringsChannel = 2;
         uint8_t reading = map(linValue, 0, 127, 1, 16);
         if (reading != lastStringsChannel) {
@@ -291,7 +280,7 @@ void loop() {
           lastStringsChannel = stringsChannel;
           isChanged = true;
         }
-      } else if (page == BRIGHTNESS) { ////// LED BRIGHTNESS //////
+      } else if (wheelMode == BRIGHTNESS) { ////// LED BRIGHTNESS //////
         static uint8_t lastBrightness;
         uint8_t reading = map(linValue, 0, 127, 2, 255);
         if (reading != lastBrightness) {
@@ -302,7 +291,8 @@ void loop() {
           lastBrightness = brightness;
           isChanged = true;
         }
-      } else if (page == SCREEN_SAVER_ENABLED) { ////// SCREEN SAVER ON //////
+      } else if (wheelMode ==
+                 SCREEN_SAVER_ENABLED) { ////// SCREEN SAVER ON //////
         static uint8_t lastscreenSaverEnabled;
         uint8_t reading = map(linValue, 0, 127, 0, 1);
         if (reading != lastscreenSaverEnabled) {
@@ -319,7 +309,7 @@ void loop() {
           isChanged = true;
           lastscreenSaverEnabled = reading;
         }
-      } else if (page == SAVE) { ////// SAVE TO EEPROM //////
+      } else if (wheelMode == SAVE) { ////// SAVE TO EEPROM //////
         if (isChanged) {
           EEPROM.write(SCALE, scale);
           EEPROM.write(BRIGHTNESS, brightness);
@@ -351,9 +341,9 @@ void loop() {
         static uint8_t lastNote;
         lastTouched = millis();
         isScreenSaver = false;
-        if (mode == DIATONIC) {
+        if (deviceMode == DIATONIC) {
           note = getChordStep(string);
-        } else if (mode == CHROMATIC) {
+        } else if (deviceMode == CHROMATIC) {
           note = getChordSemitones(string);
         }
         if (stylusReading) {
@@ -382,22 +372,22 @@ void loop() {
     while (customKeypad.available()) {
       keypadEvent e = customKeypad.read();
       uint8_t key = e.bit.KEY;
-      uint8_t led = LEDS_ORDER[key];
       uint8_t note = getNote(key);
       if (e.bit.EVENT == KEY_JUST_PRESSED) {
         lastTouched = millis();
         isScreenSaver = false;
-        if (mode == DIATONIC) {
-          page = key;
+        if (deviceMode == DIATONIC) {
+          wheelMode = key;
           chord = key;
           isKeyPressed[key] = true;
           USB_MIDI.sendNoteOn(note, 127, keyChannel);
           TRS_MIDI.sendNoteOn(note, 127, keyChannel);
-        } else if (mode == CHROMATIC) {
+        } else if (deviceMode == CHROMATIC) {
           switch (key) {
           case 0:
             majorChord = true;
             minorChord = false;
+            wheelMode = KEYS_OCTAVE;
             break;
           case 4:
             minorChord = true;
@@ -413,27 +403,26 @@ void loop() {
             break;
           default:
             rootNote = key - (key / 4) - 1;
-            uint8_t n =
+            uint8_t notePressed =
                 circleOfFifth[rootNote] + KEYBOARD_OCTAVES[keysOctaveIndex];
-            USB_MIDI.sendNoteOn(n, 127, keyChannel);
-            TRS_MIDI.sendNoteOn(n, 127, keyChannel);
+            USB_MIDI.sendNoteOn(notePressed, 127, keyChannel);
+            TRS_MIDI.sendNoteOn(notePressed, 127, keyChannel);
             break;
           }
         }
       } else if (e.bit.EVENT == KEY_JUST_RELEASED) {
-        if (mode == DIATONIC) {
-          page = DEFAULT;
+        wheelMode = DEFAULT;
+        if (deviceMode == DIATONIC) {
           isKeyPressed[key] = false;
           USB_MIDI.sendNoteOff(note, 0, keyChannel);
           TRS_MIDI.sendNoteOff(note, 0, keyChannel);
-          redrawLEDs();
-        } else if (mode == CHROMATIC) {
+        } else if (deviceMode == CHROMATIC) {
+          uint8_t keyReleased = key - (key / 4) - 1;
           if (key != 0 && key != 4 && key != 8 && key != 12) {
-            rootNote = key - (key / 4) - 1;
-            uint8_t n =
-                circleOfFifth[rootNote] + KEYBOARD_OCTAVES[keysOctaveIndex];
-            USB_MIDI.sendNoteOff(n, 0, keyChannel);
-            TRS_MIDI.sendNoteOff(n, 0, keyChannel);
+            uint8_t noteReleased =
+                circleOfFifth[keyReleased] + KEYBOARD_OCTAVES[keysOctaveIndex];
+            USB_MIDI.sendNoteOff(noteReleased, 0, keyChannel);
+            TRS_MIDI.sendNoteOff(noteReleased, 0, keyChannel);
           }
         }
       }

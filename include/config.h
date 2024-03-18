@@ -15,6 +15,8 @@ const uint8_t STRINGS_ORDER[16] = {8, 15, 14, 13, 12, 11, 10, 9,
 const uint8_t LEDS_ORDER[16] = {3,  2,  1, 0, 7,  6,  5,  4,
                                 11, 10, 9, 8, 15, 14, 13, 12};
 const uint8_t LED_COUNT = 16;
+const int8_t mapping12[16] = {-1, 0, 1, 2, -1, 3, 4,  5,
+                              -1, 6, 7, 8, -1, 9, 10, 11};
 ////// PINS //////
 const uint8_t MIDI_TX_PIN = 12; // MIDI out pin
 const uint8_t MIDI_RX_PIN = 13; // MIDI in pin
@@ -30,6 +32,7 @@ const uint8_t CLOCK_PIN = 18;
 const uint8_t UPDATE_INTERVAL = 10;
 const uint16_t SCREEN_SAVER_TIMOUT = 60000;
 ////// SCALES //////
+const uint8_t KEYBOARD_OCTAVES[4] = {36, 48, 60, 72};
 const int8_t SCALES[16][7] = {
     {0, 2, 4, 5, 7, 9, 11},  // 1.Major (Ionian)
     {0, 2, 3, 5, 7, 9, 10},  // 2.Dorian
@@ -67,7 +70,7 @@ const int8_t chordTypesSemitones[10][4] = {
     {0, 5, 7, -1}, // Suspended 4th
     {0, 4, 7, 10}  // Dominant 7th
 };
-enum Modes { DIATONIC, CHROMATIC };
+enum Modes { DIATONIC, CHROMATIC, SETTINGS };
 enum ChromaticChords { MAJOR, MINOR, MAJ7, MIN7, AUGMENTED, DIMINISHED };
 enum DiatonicParameters {
   KEYS_OCTAVE,
