@@ -104,17 +104,7 @@ void redrawLEDs() {
         color = RED;
       } else if (isKeyPressed[i] == true) { // key
         color = BLUE;
-      }
-      // else if (i == scale) { // scale
-      //   color = YELLOW;
-      // }
-      //  else if (i == keysOctaveIndex * 4) {
-      //   color = CYAN;
-      // }
-      // else if (i == 1 + transpose + (transpose / 3)) {
-      //   color = PURPLE;
-      // }
-      else {
+      } else {
         color = 0;
       }
     } else if (deviceMode == CHROMATIC) {
@@ -174,7 +164,6 @@ void setup() {
   keyChannel = EEPROM.read(KEYS_CHANNEL);
   stringsChannel = EEPROM.read(STRINGS_CHANNEL);
   transpose = EEPROM.read(TRANSPOSE);
-  screenSvaerEnabled = EEPROM.read(SCREEN_SAVER_ENABLED);
   keysOctaveIndex = EEPROM.read(KEYS_OCTAVE);
   scale = EEPROM.read(SCALE);
   ////// PIXELS //////
@@ -219,12 +208,9 @@ void loop() {
         uint8_t reading = map(linValue, 0, 127, 0, 3);
         if (reading != lastOctaveIndex) {
           keysOctaveIndex = reading;
-          uint8_t lastNote = KEYBOARD_OCTAVES[lastOctaveIndex] + transpose;
-          uint8_t newNote = KEYBOARD_OCTAVES[keysOctaveIndex] + transpose;
+          uint8_t lastNote = KEYBOARD_OCTAVES[lastOctaveIndex] + transpose - 12;
           USB_MIDI.sendNoteOff(lastNote, 0, keyChannel);
-          USB_MIDI.sendNoteOn(newNote, 127, keyChannel);
           TRS_MIDI.sendNoteOff(lastNote, 0, keyChannel);
-          TRS_MIDI.sendNoteOn(newNote, 127, keyChannel);
           clearScreen();
           uint8_t led = keysOctaveIndex * 4;
           pixel.setPixelColor(LEDS_ORDER[led], CYAN);
@@ -291,24 +277,6 @@ void loop() {
           lastBrightness = brightness;
           isChanged = true;
         }
-      } else if (wheelMode ==
-                 SCREEN_SAVER_ENABLED) { ////// SCREEN SAVER ON //////
-        static uint8_t lastscreenSaverEnabled;
-        uint8_t reading = map(linValue, 0, 127, 0, 1);
-        if (reading != lastscreenSaverEnabled) {
-          screenSvaerEnabled = !screenSvaerEnabled;
-          uint8_t note = getNote(5);
-          USB_MIDI.sendNoteOff(note, 0, keyChannel);
-          TRS_MIDI.sendNoteOff(note, 0, keyChannel);
-          if (screenSvaerEnabled) {
-            screenSaver(1);
-          } else {
-            clearScreen();
-            pixel.show();
-          }
-          isChanged = true;
-          lastscreenSaverEnabled = reading;
-        }
       } else if (wheelMode == SAVE) { ////// SAVE TO EEPROM //////
         if (isChanged) {
           EEPROM.write(SCALE, scale);
@@ -316,7 +284,6 @@ void loop() {
           EEPROM.write(TRANSPOSE, transpose);
           EEPROM.write(KEYS_CHANNEL, keyChannel);
           EEPROM.write(STRINGS_CHANNEL, stringsChannel);
-          EEPROM.write(SCREEN_SAVER_ENABLED, screenSvaerEnabled);
           EEPROM.write(KEYS_OCTAVE, keysOctaveIndex);
           EEPROM.commit();
           isChanged = false;
@@ -392,14 +359,17 @@ void loop() {
           case 4:
             minorChord = true;
             majorChord = false;
+            wheelMode = KEYS_CHANNEL;
             break;
           case 8:
             seventhChord = !seventhChord;
             dimAugChord = false;
+            wheelMode = STRINGS_CHANNEL;
             break;
           case 12:
             dimAugChord = !dimAugChord;
             seventhChord = false;
+            wheelMode = BRIGHTNESS;
             break;
           default:
             rootNote = key - (key / 4) - 1;

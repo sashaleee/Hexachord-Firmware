@@ -56,8 +56,8 @@ const uint8_t circleOfFifth[] = {5, 0, 7, 2, 9, 4, 11, 6, 1, 8, 3, 10};
 ////// CHORD TYPES //////
 const int8_t chordTypesSteps[4][3] = {{0, 2, 4},  // Triad
                                       {0, 2, 6},  // 7th chord
-                                      {0, 1, 4},  //
-                                      {1, 3, 6}}; //
+                                      {0, 1, 4},  // not in use
+                                      {1, 3, 6}}; // not in use
 const int8_t chordTypesSemitones[10][4] = {
     {0, 4, 7, -1}, // Major
     {0, 3, 7, -1}, // Minor
@@ -65,21 +65,20 @@ const int8_t chordTypesSemitones[10][4] = {
     {0, 3, 7, 10}, // Minor 7th
     {0, 4, 8, -1}, // Augmented
     {0, 3, 6, -1}, // Diminished
-
+                   // not in use //
     {0, 2, 7, -1}, // Suspended 2nd
     {0, 5, 7, -1}, // Suspended 4th
     {0, 4, 7, 10}  // Dominant 7th
 };
-enum Modes { DIATONIC, CHROMATIC, SETTINGS };
+enum Modes { DIATONIC, CHROMATIC };
 enum ChromaticChords { MAJOR, MINOR, MAJ7, MIN7, AUGMENTED, DIMINISHED };
 enum DiatonicParameters {
-  KEYS_OCTAVE,
-  KEYS_CHANNEL,
-  STRINGS_CHANNEL,
-  BRIGHTNESS,
-  SCREEN_SAVER_ENABLED,
-  SCALE,
-  TRANSPOSE,
+  KEYS_OCTAVE = 0,
+  TRANSPOSE = 1,
+  SCALE = 2,
+  KEYS_CHANNEL = 4,
+  STRINGS_CHANNEL = 8,
+  BRIGHTNESS = 12,
   DEFAULT,
   SAVE = 15
 };
