@@ -219,8 +219,8 @@ void loop() {
         uint8_t reading = map(linValue, 0, 127, 0, 3);
         if (reading != lastOctaveIndex) {
           keysOctaveIndex = reading;
-          uint8_t lastNote = KEYBOARD_OCTAVES[lastOctaveIndex] + transpose - 12;
-          uint8_t newNote = KEYBOARD_OCTAVES[keysOctaveIndex] + transpose - 12;
+          uint8_t lastNote = KEYBOARD_OCTAVES[lastOctaveIndex] + transpose;
+          uint8_t newNote = KEYBOARD_OCTAVES[keysOctaveIndex] + transpose;
           USB_MIDI.sendNoteOff(lastNote, 0, keyChannel);
           USB_MIDI.sendNoteOn(newNote, 127, keyChannel);
           TRS_MIDI.sendNoteOff(lastNote, 0, keyChannel);
