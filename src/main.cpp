@@ -9,31 +9,51 @@ Potentiometer wheel;
 
 Adafruit_Keypad customKeypad =
     Adafruit_Keypad(makeKeymap(keys), rowPins, colPins, ROWS, COLS);
-////// LED //////
+
+////// PARAMETERS //////
+struct ChromaticMode {
+  bool majorChord = true;
+  bool minorChord;
+  bool seventhChord;
+  bool dimAugChord;
+  uint8_t root;
+} chromatic;
+struct DiatonicMode {
+  uint8_t scale;
+  uint8_t transpose;
+  uint8_t root;
+} diatonic;
+struct Device {
+  uint8_t keysOctaveIndex = 2;
+  uint8_t wheelMode = DEFAULT;
+  uint8_t deviceMode;
+  uint8_t keyChannel = 1;
+  uint8_t stringsChannel = 2;
+  uint8_t brightness = 50;
+  uint64_t lastTouched;
+  bool isScreenSaver;
+  bool isChanged;
+  bool isKeyPressed[16] = {};
+  bool isStringPressed[16] = {};
+} device;
+
 uint8_t brightness = 50;
 uint64_t lastTouched;
 bool isKeyPressed[16] = {};
 bool isStringPressed[16] = {};
 bool isScreenSaver;
-bool screenSvaerEnabled;
-////// PARAMETERS //////
 uint8_t wheelMode = DEFAULT;
 uint8_t deviceMode;
-
 bool isChanged;
-
 bool majorChord = true;
 bool minorChord;
 bool seventhChord;
 bool dimAugChord;
 uint8_t rootNote;
-
 uint8_t scale;
 uint8_t chord;
 uint8_t transpose = 0;
-
 uint8_t keysOctaveIndex = 2;
-
 uint8_t keyChannel = 1;
 uint8_t stringsChannel = 2;
 ////// GET NOTE //////
@@ -208,7 +228,8 @@ void loop() {
         uint8_t reading = map(linValue, 0, 127, 0, 3);
         if (reading != lastOctaveIndex) {
           keysOctaveIndex = reading;
-          uint8_t lastNote = KEYBOARD_OCTAVES[lastOctaveIndex] + transpose - 12;
+          uint8_t lastNote = KEYBOARD_OCTAVES[lastOctaveIndex] +
+                             (transpose * (deviceMode == DIATONIC)) - 12;
           USB_MIDI.sendNoteOff(lastNote, 0, keyChannel);
           TRS_MIDI.sendNoteOff(lastNote, 0, keyChannel);
           clearScreen();
@@ -241,7 +262,7 @@ void loop() {
         static uint8_t lastKeyChannel = 1;
         uint8_t reading = map(linValue, 0, 127, 1, 16);
         if (reading != lastKeyChannel) {
-          uint8_t note = getNote(2);
+          uint8_t note = getNote(KEYS_CHANNEL);
           USB_MIDI.sendNoteOff(note, 0, keyChannel);
           TRS_MIDI.sendNoteOff(note, 0, keyChannel);
           keyChannel = reading;
@@ -256,7 +277,7 @@ void loop() {
         static uint8_t lastStringsChannel = 2;
         uint8_t reading = map(linValue, 0, 127, 1, 16);
         if (reading != lastStringsChannel) {
-          uint8_t note = getNote(3);
+          uint8_t note = getNote(STRINGS_CHANNEL);
           USB_MIDI.sendNoteOff(note, 0, keyChannel);
           TRS_MIDI.sendNoteOff(note, 0, keyChannel);
           stringsChannel = reading;
@@ -399,8 +420,7 @@ void loop() {
       redrawLEDs();
     }
     ////// SCREEN SAVER //////
-    if (millis() > lastTouched + SCREEN_SAVER_TIMOUT && !isScreenSaver &&
-        screenSvaerEnabled) {
+    if (millis() > lastTouched + SCREEN_SAVER_TIMOUT && !isScreenSaver) {
       screenSaver(20);
     }
   }
