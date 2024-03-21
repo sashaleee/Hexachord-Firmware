@@ -21,7 +21,7 @@ struct ChromaticMode {
 struct DiatonicMode {
   uint8_t scale;
   uint8_t transpose;
-  uint8_t root;
+  uint8_t root; // chord
 } diatonic;
 struct Device {
   uint8_t keysOctaveIndex = 2;
@@ -45,19 +45,19 @@ bool isScreenSaver;
 uint8_t wheelMode = DEFAULT;
 uint8_t deviceMode;
 bool isChanged;
-bool majorChord = true;
-bool minorChord;
-bool seventhChord;
-bool dimAugChord;
-uint8_t rootNote;
+// bool majorChord = true;
+// bool minorChord;
+// bool seventhChord;
+// bool dimAugChord;
+// uint8_t rootNote;
 uint8_t scale;
-uint8_t chord;
+// uint8_t chord;
 uint8_t transpose = 0;
 uint8_t keysOctaveIndex = 2;
 uint8_t keyChannel = 1;
 uint8_t stringsChannel = 2;
-////// GET NOTE //////
-uint8_t getNote(uint8_t step) {
+////// GET ROOT NOTE //////
+uint8_t getRootNote(uint8_t step) {
   if (step > 0) {
     uint8_t octave = ((step - 1) / 7) * 12;
     uint8_t noteIndex = ((step - 1) % 7);
@@ -71,8 +71,8 @@ uint8_t getNote(uint8_t step) {
 uint8_t getChordStep(uint8_t noteIndex) {
   const uint8_t NOTES_NUM = 3;
   uint8_t octave = (noteIndex / NOTES_NUM) * 12;
-  uint8_t root = chord - (chord > 0);
-  uint8_t chordType = (chord > 7);
+  uint8_t root = diatonic.root - (diatonic.root > 0);
+  uint8_t chordType = (diatonic.root > 7);
   uint8_t step = chordTypesSteps[chordType][(noteIndex % NOTES_NUM)];
   uint8_t note = SCALES[scale][(step + root) % 7];
   return 36 + octave + note + transpose;
@@ -80,29 +80,35 @@ uint8_t getChordStep(uint8_t noteIndex) {
 ////// OMNICHORD CHORD TYPE //////
 uint8_t getChordType() {
   uint8_t result;
-  if (majorChord & !minorChord & !seventhChord & !dimAugChord) {
+  if (chromatic.majorChord & !chromatic.minorChord & !chromatic.seventhChord &
+      !chromatic.dimAugChord) {
     result = MAJOR;
-  } else if (!majorChord & minorChord & !seventhChord & !dimAugChord) {
+  } else if (!chromatic.majorChord & chromatic.minorChord &
+             !chromatic.seventhChord & !chromatic.dimAugChord) {
     result = MINOR;
-  } else if (majorChord & !minorChord & seventhChord & !dimAugChord) {
+  } else if (chromatic.majorChord & !chromatic.minorChord &
+             chromatic.seventhChord & !chromatic.dimAugChord) {
     result = MAJ7;
-  } else if (!majorChord & minorChord & seventhChord & !dimAugChord) {
+  } else if (!chromatic.majorChord & chromatic.minorChord &
+             chromatic.seventhChord & !chromatic.dimAugChord) {
     result = MIN7;
-  } else if (majorChord & !minorChord & !seventhChord & dimAugChord) {
+  } else if (chromatic.majorChord & !chromatic.minorChord &
+             !chromatic.seventhChord & chromatic.dimAugChord) {
     result = AUGMENTED;
-  } else if (!majorChord & minorChord & !seventhChord & dimAugChord) {
+  } else if (!chromatic.majorChord & chromatic.minorChord &
+             !chromatic.seventhChord & chromatic.dimAugChord) {
     result = DIMINISHED;
   }
   return result;
 }
 ////// GET OMNICHORD //////
-uint8_t getChordSemitones(uint8_t stringIndex) {
+uint8_t getChordChromatic(uint8_t stringIndex) {
   uint8_t chordType = getChordType();
   uint8_t notesNum = 3 + (chordType == MAJ7 || chordType == MIN7);
   uint8_t octave = (stringIndex / notesNum) * 12;
   uint8_t step = stringIndex % notesNum;
   uint8_t note = octave + chordTypesSemitones[chordType][step];
-  return note + 36 + circleOfFifth[rootNote];
+  return note + 36 + circleOfFifth[chromatic.root];
 }
 ////// SCREEN SAVER //////
 void screenSaver(uint16_t delTime) {
@@ -120,7 +126,7 @@ void redrawLEDs() {
     if (deviceMode == DIATONIC) {
       if (isStringPressed[i] == true) { // string
         color = YELLOW;
-      } else if (i == chord) { // chord
+      } else if (i == diatonic.root) { // chord
         color = RED;
       } else if (isKeyPressed[i] == true) { // key
         color = BLUE;
@@ -130,19 +136,19 @@ void redrawLEDs() {
     } else if (deviceMode == CHROMATIC) {
       switch (i) {
       case 0:
-        color = CYAN * majorChord;
+        color = CYAN * chromatic.majorChord;
         break;
       case 4:
-        color = CYAN * minorChord;
+        color = CYAN * chromatic.minorChord;
         break;
       case 8:
-        color = CYAN * seventhChord;
+        color = CYAN * chromatic.seventhChord;
         break;
       case 12:
-        color = CYAN * dimAugChord;
+        color = CYAN * chromatic.dimAugChord;
         break;
       default:
-        if (i == 1 + rootNote + (rootNote / 3)) {
+        if (i == 1 + chromatic.root + (chromatic.root / 3)) {
           color = PURPLE;
         } else {
           color = 0;
@@ -262,9 +268,11 @@ void loop() {
         static uint8_t lastKeyChannel = 1;
         uint8_t reading = map(linValue, 0, 127, 1, 16);
         if (reading != lastKeyChannel) {
-          uint8_t note = getNote(KEYS_CHANNEL);
-          USB_MIDI.sendNoteOff(note, 0, keyChannel);
-          TRS_MIDI.sendNoteOff(note, 0, keyChannel);
+          if (deviceMode == DIATONIC) {
+            uint8_t note = getRootNote(KEYS_CHANNEL);
+            USB_MIDI.sendNoteOff(note, 0, keyChannel);
+            TRS_MIDI.sendNoteOff(note, 0, keyChannel);
+          }
           keyChannel = reading;
           clearScreen();
           pixel.setPixelColor(LEDS_ORDER[keyChannel - 1], WHITE);
@@ -277,9 +285,11 @@ void loop() {
         static uint8_t lastStringsChannel = 2;
         uint8_t reading = map(linValue, 0, 127, 1, 16);
         if (reading != lastStringsChannel) {
-          uint8_t note = getNote(STRINGS_CHANNEL);
-          USB_MIDI.sendNoteOff(note, 0, keyChannel);
-          TRS_MIDI.sendNoteOff(note, 0, keyChannel);
+          if (deviceMode == DIATONIC) {
+            uint8_t note = getRootNote(STRINGS_CHANNEL);
+            USB_MIDI.sendNoteOff(note, 0, keyChannel);
+            TRS_MIDI.sendNoteOff(note, 0, keyChannel);
+          }
           stringsChannel = reading;
           clearScreen();
           pixel.setPixelColor(LEDS_ORDER[stringsChannel - 1], WHITE);
@@ -332,7 +342,7 @@ void loop() {
         if (deviceMode == DIATONIC) {
           note = getChordStep(string);
         } else if (deviceMode == CHROMATIC) {
-          note = getChordSemitones(string);
+          note = getChordChromatic(string);
         }
         if (stylusReading) {
           if (lastNote > 0) {
@@ -360,42 +370,42 @@ void loop() {
     while (customKeypad.available()) {
       keypadEvent e = customKeypad.read();
       uint8_t key = e.bit.KEY;
-      uint8_t note = getNote(key);
       if (e.bit.EVENT == KEY_JUST_PRESSED) {
         lastTouched = millis();
         isScreenSaver = false;
         if (deviceMode == DIATONIC) {
           wheelMode = key;
-          chord = key;
+          diatonic.root = key;
           isKeyPressed[key] = true;
+          uint8_t note = getRootNote(key);
           USB_MIDI.sendNoteOn(note, 127, keyChannel);
           TRS_MIDI.sendNoteOn(note, 127, keyChannel);
         } else if (deviceMode == CHROMATIC) {
           switch (key) {
           case 0:
-            majorChord = true;
-            minorChord = false;
+            chromatic.majorChord = true;
+            chromatic.minorChord = false;
             wheelMode = KEYS_OCTAVE;
             break;
           case 4:
-            minorChord = true;
-            majorChord = false;
+            chromatic.minorChord = true;
+            chromatic.majorChord = false;
             wheelMode = KEYS_CHANNEL;
             break;
           case 8:
-            seventhChord = !seventhChord;
-            dimAugChord = false;
+            chromatic.seventhChord = !chromatic.seventhChord;
+            chromatic.dimAugChord = false;
             wheelMode = STRINGS_CHANNEL;
             break;
           case 12:
-            dimAugChord = !dimAugChord;
-            seventhChord = false;
+            chromatic.dimAugChord = !chromatic.dimAugChord;
+            chromatic.seventhChord = false;
             wheelMode = BRIGHTNESS;
             break;
           default:
-            rootNote = key - (key / 4) - 1;
-            uint8_t notePressed =
-                circleOfFifth[rootNote] + KEYBOARD_OCTAVES[keysOctaveIndex];
+            chromatic.root = key - (key / 4) - 1;
+            uint8_t notePressed = circleOfFifth[chromatic.root] +
+                                  KEYBOARD_OCTAVES[keysOctaveIndex];
             USB_MIDI.sendNoteOn(notePressed, 127, keyChannel);
             TRS_MIDI.sendNoteOn(notePressed, 127, keyChannel);
             break;
@@ -405,6 +415,7 @@ void loop() {
         wheelMode = DEFAULT;
         if (deviceMode == DIATONIC) {
           isKeyPressed[key] = false;
+          uint8_t note = getRootNote(key);
           USB_MIDI.sendNoteOff(note, 0, keyChannel);
           TRS_MIDI.sendNoteOff(note, 0, keyChannel);
         } else if (deviceMode == CHROMATIC) {
