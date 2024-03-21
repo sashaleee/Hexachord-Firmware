@@ -11,32 +11,6 @@ Adafruit_Keypad customKeypad =
     Adafruit_Keypad(makeKeymap(keys), rowPins, colPins, ROWS, COLS);
 
 ////// PARAMETERS //////
-struct ChromaticMode {
-  bool majorChord = true;
-  bool minorChord;
-  bool seventhChord;
-  bool dimAugChord;
-  uint8_t root;
-} chromatic;
-struct DiatonicMode {
-  uint8_t scale;
-  uint8_t transpose;
-  uint8_t root;
-} diatonic;
-struct Device {
-  uint8_t keysOctaveIndex = 2;
-  uint8_t wheelMode = DEFAULT;
-  uint8_t deviceMode;
-  uint8_t keyChannel = 1;
-  uint8_t stringsChannel = 2;
-  uint8_t brightness = 50;
-  uint64_t lastTouched;
-  bool isScreenSaver;
-  bool isChanged;
-  bool isKeyPressed[16] = {};
-  bool isStringPressed[16] = {};
-} device;
-
 uint8_t brightness = 50;
 uint64_t lastTouched;
 bool isKeyPressed[16] = {};
@@ -149,7 +123,6 @@ void redrawLEDs() {
         }
         break;
       }
-      //
     }
     pixel.setPixelColor(LEDS_ORDER[i], color);
   }
@@ -191,7 +164,6 @@ void setup() {
   pixel.setBrightness(brightness);
   redrawLEDs();
 }
-
 void loop() {
   static uint64_t lastUpdateTime;
   if (millis() > lastUpdateTime + UPDATE_INTERVAL) {
@@ -217,6 +189,9 @@ void loop() {
         uint8_t reading = map(linValue, 0, 127, 0, 15);
         if (reading != lastScale) {
           scale = reading;
+          uint8_t note = getNote(SCALE);
+          USB_MIDI.sendNoteOff(note, 0, keyChannel);
+          TRS_MIDI.sendNoteOff(note, 0, keyChannel);
           clearScreen();
           pixel.setPixelColor(LEDS_ORDER[scale], YELLOW);
           pixel.show();
