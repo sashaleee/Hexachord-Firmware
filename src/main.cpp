@@ -162,6 +162,8 @@ void setup() {
   ////// PIXELS //////
   pixel.begin();
   pixel.setBrightness(brightness);
+  screenSaver(30);
+  delay(666);
   redrawLEDs();
 }
 void loop() {
